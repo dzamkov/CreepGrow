@@ -82,7 +82,7 @@ type Joint (radius : double, center : Vector3d) as this =
                 Joint.Connect (this, newLeader)
                 newLeader.Grow (volume)
             else
-                let dir = Vector3d.Normalize (dif / dis + Vector3d (rand.NextDouble () - 0.5, rand.NextDouble () - 0.5, rand.NextDouble () - 0.5) * 2.0 - Vector3d (0.0, 0.0, center.Z) * 0.3)
+                let dir = Vector3d.Normalize (dif / dis + Vector3d (rand.NextDouble () - 0.5, rand.NextDouble () - 0.5, rand.NextDouble () - 0.5) * 2.0 + Vector3d (0.0, 0.0, -center.Z * 0.3))
                 center <- center + dir * volume * 20.0
         else
             let taken = volume * 0.01 * (0.1 / (radius + 0.1))
@@ -141,6 +141,7 @@ type Window () =
         GL.Light (LightName.Light1, LightParameter.Ambient, Color4 (0.0f, 0.0f, 0.0f, 0.0f))
         GL.Light (LightName.Light1, LightParameter.Diffuse, Color4 (-0.5f, -0.5f, -0.5f, 0.0f))
         GL.Light (LightName.Light1, LightParameter.Specular, Color4 (0.0f, 0.0f, 0.0f, 0.0f))
+
 
         this.Keyboard.KeyDown.Add (fun args -> this.KeyDown args.Key)
 

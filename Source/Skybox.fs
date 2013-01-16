@@ -33,7 +33,7 @@ module Skybox =
         let prepareFile path =
             let texture = Texture.loadFile Texture.Format.rgb path
             Texture.setWrap TextureTarget.Texture2D TextureWrapMode.ClampToEdge TextureWrapMode.ClampToEdge
-            Texture.setFilter TextureTarget.Texture2D TextureMinFilter.Nearest TextureMagFilter.Nearest
+            Texture.setFilter TextureTarget.Texture2D TextureMinFilter.Linear TextureMagFilter.Linear
             texture
         let loadPart names =
             Seq.pick (fun path ->
