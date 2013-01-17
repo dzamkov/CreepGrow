@@ -45,7 +45,7 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Space.fs" />
+    <Compile Include="Container.fs" />
     <Compile Include="Render.fs" />
     <Compile Include="Texture.fs" />
     <Compile Include="Skybox.fs" />

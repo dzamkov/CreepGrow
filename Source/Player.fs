@@ -23,11 +23,15 @@ type Player () =
         and set value = phi <- value |> max (Math.PI * -0.4) |> min (Math.PI * 0.4)
 
     /// Gets the direction the player is looking towards.
-    member this.FowardDirection = 
+    member this.EyeDirection = 
         Vector3d (
             cos theta * cos phi,
             sin theta * cos phi,
             sin phi)
+
+    /// Gets the direction the player is facing.
+    member this.FowardDirection =
+        Vector3d (cos theta, sin theta, 0.0)
 
     /// Gets the direction going above the player.
     member this.UpDirection = up
