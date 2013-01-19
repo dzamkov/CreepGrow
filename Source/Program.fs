@@ -10,6 +10,8 @@ open OpenTK.Graphics
 open OpenTK.Graphics.OpenGL
 open OpenTK.Input
 
+open Quantity
+
 let rand = Random ()
 
 /// A joint on a tendril of the creep.
@@ -155,7 +157,10 @@ type Window () =
         let mutable proj = Matrix4d.CreatePerspectiveFieldOfView (1.2, float this.Width / float this.Height, 0.1, 1000.0)
         GL.LoadMatrix &proj
 
-        let mutable view = Matrix4d.LookAt (Vector3d (0.0, 0.0, 0.0), player.FowardDirection, player.UpDirection)
+        let eyeDir = Player.eyeDir player |> Vector3.toOpenGL
+        let eyePos = Player.eyePos player |> Vector3.toOpenGL
+        let upDir = Player.upDir |> Vector3.toOpenGL
+        let mutable view = Matrix4d.LookAt (Vector3d (0.0, 0.0, 0.0), eyeDir, upDir)
         GL.MultMatrix &view
 
         GL.Disable (EnableCap.DepthTest)
@@ -164,7 +169,7 @@ type Window () =
         GL.Color3 (1.0, 1.0, 1.0)
         Skybox.render (Resources.Skybox.day.Force ())
 
-        GL.Translate -player.EyePosition
+        GL.Translate -eyePos
 
         let points = List<Vector3d> ()
         let tris = List<int * int * int> ()
@@ -220,7 +225,7 @@ type Window () =
         GL.BlendEquation (BlendEquationMode.FuncAdd)
 
         let renderGround = Ground.prepare (Resources.ground.Force ()) (Color4 (1.2f, 1.2f, 1.2f, 1.0f)) 10
-        renderGround player.EyePosition ()
+        renderGround eyePos ()
 
         GL.ColorMask (false, false, false, false)
         GL.Begin BeginMode.Quads
@@ -255,6 +260,8 @@ type Window () =
         GL.Viewport (0, 0, this.Width, this.Height)
 
     override this.OnUpdateFrame args =
+        let updateTime = scalar<s> args.Time
+
         creepRoot.Grow (0.8 * args.Time)
         if this.Focused then
             Cursor.Hide ()
@@ -269,11 +276,9 @@ type Window () =
             player.Theta <- player.Theta - double dX / 300.0
             player.Phi <- player.Phi - double dY / 300.0
         else Cursor.Show ()
-        if this.Keyboard.[Key.W] then player.FootPosition <- player.FootPosition + player.FowardDirection * args.Time * 3.0
-        if this.Keyboard.[Key.S] then player.FootPosition <- player.FootPosition - player.FowardDirection * args.Time * 3.0
-        if this.Keyboard.[Key.A] then player.FootPosition <- player.FootPosition + player.LeftDirection * args.Time * 3.0
-        if this.Keyboard.[Key.D] then player.FootPosition <- player.FootPosition - player.LeftDirection * args.Time * 3.0
-        player.FootPosition <- Vector3d (player.FootPosition.X, player.FootPosition.Y, 0.0)
+
+        let isDown key = this.Keyboard.[key]
+        Player.update player (isDown Key.W) (isDown Key.A) (isDown Key.S) (isDown Key.D) updateTime
 
 [<EntryPoint>]
 let main argv = 

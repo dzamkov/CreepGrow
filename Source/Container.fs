@@ -2,7 +2,7 @@
 
 open System
 open System.Collections.Generic
-open OpenTK
+open Quantity
 
 /// A vector in three-dimensional space.
 type Vector = Vector3d
@@ -14,50 +14,45 @@ type Point = Vector3d
 module Bounds =
 
     /// An axis-aligned bounding box.
-    type [<Struct>] Box =
+    type [<Struct>] Box<[<Measure>] 'u> =
 
         /// The minimum point in this bounding box.
-        val Min : Point
+        val Min : Vector3<'u>
 
         /// The maximum point in this bounding box.
-        val Max : Point
+        val Max : Vector3<'u>
 
         new (min, max) = { Min = min; Max = max }
         new (vertex) = { Min = vertex; Max = vertex }
 
         /// Gets the union of two bounding boxes.
-        static member (||.) (a : Box, b : Box) =
-            Box (Vector (min a.Min.X b.Min.X,
-                         min a.Min.Y b.Min.Y, 
-                         min a.Min.Z b.Min.Z),
-                 Vector (max a.Max.X b.Max.X,
-                         max a.Max.Y b.Max.Y, 
-                         max a.Max.Z b.Max.Z))
+        static member (||.) (a : Box<'u>, b : Box<'u>) =
+            Box (Vector3 (min a.Min.X b.Min.X,
+                          min a.Min.Y b.Min.Y, 
+                          min a.Min.Z b.Min.Z),
+                 Vector3 (max a.Max.X b.Max.X,
+                          max a.Max.Y b.Max.Y, 
+                          max a.Max.Z b.Max.Z))
 
         /// Gets the union of a bounding box and a point.
-        static member (|.) (a : Box, b : Vector) =
-            Box (Vector (min a.Min.X b.X,
-                         min a.Min.Y b.Y, 
-                         min a.Min.Z b.Z),
-                 Vector (max a.Max.X b.X,
-                         max a.Max.Y b.Y, 
-                         max a.Max.Z b.Z))
+        static member (|.) (a : Box<'u>, b : Vector3<'u>) =
+            Box (Vector3 (min a.Min.X b.X,
+                          min a.Min.Y b.Y, 
+                          min a.Min.Z b.Z),
+                 Vector3 (max a.Max.X b.X,
+                          max a.Max.Y b.Y, 
+                          max a.Max.Z b.Z))
 
         /// Gets a null bounding box, one that contains no points and does not influence
         /// a union of bounding boxes.
         static member Null =
-            Box (Vector (infinity, infinity, infinity),
-                 Vector (-infinity, -infinity, -infinity))
+            Box (vec3 infinity infinity infinity,
+                 vec3 -infinity -infinity -infinity)
 
         /// Determines whether this bounding box contains the given point.
-        member this.Contains (point : Point) =
+        member this.Contains (point : Vector3<'u>) =
             point.X >= this.Min.X && point.Y >= this.Min.Y && point.Z >= this.Min.Z &&
             point.X <= this.Max.X && point.Y <= this.Max.Y && point.Z <= this.Max.Z
-
-/// A collection of spatial items organized by location.
-type Container<'a> =
-    interface
-    end
 
 /// Contains functions and types related to containers.
 module Container =
@@ -73,7 +68,7 @@ module Container =
             new (x, y, z) = {X = x; Y = y; Z = z}
 
         /// Finds the index for the bin the given point occupies.
-        let pointIndex (binSize : Vector) (point : Point) =
+        let pointIndex (binSize : Vector3<'u>) (point : Vector3<'u>) =
             Index (floor (point.X / binSize.X) |> int,
                    floor (point.Y / binSize.Y) |> int,
                    floor (point.Z / binSize.Z) |> int)
@@ -108,7 +103,7 @@ module Container =
             member this.Height = this.Max.Z - this.Min.Z + 1
 
         /// Finds the range of bins a bounding box occupies.
-        let boxRange (binSize : Vector) (box : Bounds.Box) =
+        let boxRange (binSize : Vector3<'u>) (box : Bounds.Box<'u>) =
             Range (pointIndex binSize box.Min, pointIndex binSize box.Max)
 
         /// An identifier and storage structure for items.
@@ -127,7 +122,7 @@ module Container =
         type Bin<'a> = List<Item<'a>>
 
         /// A container that organizes items using equal-sized bins.
-        type Container<'a> (binSize : Vector) =
+        type Container<'a, [<Measure>] 'u> (binSize : Vector3<'u>) =
             let mutable bins = null
             let mutable offset = Index ()
 
@@ -202,7 +197,7 @@ module Container =
                             insertItem bins offset index item
 
             /// Inserts an item into this container.
-            member this.Insert (value : 'a, bounds : Bounds.Box) =
+            member this.Insert (value : 'a, bounds : Bounds.Box<'u>) =
                 this.Insert (value, boxRange binSize bounds)
 
             /// Updates the range of an item in this container.
@@ -223,7 +218,7 @@ module Container =
                                 removeItem bins offset index item
 
             /// Updates the bounding box of an item in this container.
-            member this.Update (item : Item<'a>, nBounds : Bounds.Box) =
+            member this.Update (item : Item<'a>, nBounds : Bounds.Box<'u>) =
                 this.Update (item, boxRange binSize nBounds)
 
             /// Removes an item from this container.
@@ -268,7 +263,7 @@ module Container =
                                         then f lItem mItem
 
     /// A bin-based container that is both absolute and pairwise.
-    type Bin<'a> = Bin.Container<'a>
+    type Bin<'a, [<Measure>] 'u> = Bin.Container<'a, 'u>
 
     /// Creates an empty bin-based container.
-    let bin binSize = Bin.Container<'a> binSize
+    let bin binSize = new Bin.Container<'a, 'u> (binSize)

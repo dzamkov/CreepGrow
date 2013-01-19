@@ -45,6 +45,7 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Quantity.fs" />
     <Compile Include="Container.fs" />
     <Compile Include="Render.fs" />
     <Compile Include="Texture.fs" />
@@ -52,6 +53,7 @@
     <Compile Include="Ground.fs" />
     <Compile Include="Resources.fs" />
     <Compile Include="Player.fs" />
+    <Compile Include="Creep.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <PropertyGroup>

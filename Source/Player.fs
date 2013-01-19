@@ -1,51 +1,64 @@
 ﻿namespace CreepGrow
 
 open System
+open Quantity
 
-open OpenTK
-
-/// Represents a player.
+/// Describes a player.
 type Player () =
     let mutable theta = 0.0
     let mutable phi = 0.0
-    let mutable position = Vector3d (0.0, 0.0, 0.0)
-    static let eyeHeight = 1.6
-    static let up = Vector3d (0.0, 0.0, 1.0)
+    let mutable position = vec3<m> 0.0 0.0 0.0
+    static let eyeHeight = scalar<m> 1.6
+    static let up = vec3<1> 0.0 0.0 1.0
 
-    /// Gets or sets the angle on the Z axis the player is looking towards.
-    member this.Theta
-        with get () = theta
-        and set value = theta <- value
+    /// The angle on the Z axis the player is looking towards.
+    [<DefaultValue>] val mutable Theta : float
 
-    /// Gets or sets the angle above the XY plane the player is looking towards.
-    member this.Phi
-        with get () = phi
-        and set value = phi <- value |> max (Math.PI * -0.4) |> min (Math.PI * 0.4)
+    /// The angle above the XY plane the player is looking towards.
+    [<DefaultValue>] val mutable Phi : float
 
-    /// Gets the direction the player is looking towards.
-    member this.EyeDirection = 
-        Vector3d (
-            cos theta * cos phi,
-            sin theta * cos phi,
-            sin phi)
+    /// The position of the player.
+    [<DefaultValue>] val mutable Position : Vector3<m>
 
-    /// Gets the direction the player is facing.
-    member this.FowardDirection =
-        Vector3d (cos theta, sin theta, 0.0)
+/// Contains functions related to the player.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Player =
 
-    /// Gets the direction going above the player.
-    member this.UpDirection = up
+    /// The direction going above a player.
+    let upDir = vec3<1> 0.0 0.0 1.0
 
-    /// Gets the direction going to the left of the player.
-    member this.LeftDirection = 
-        Vector3d.Normalize (Vector3d.Cross (this.UpDirection, this.FowardDirection))
+    /// Gets the direction a player is looking towards.
+    let eyeDir (player : Player) = Vector3.spherical player.Theta player.Phi 1.0
 
-    /// Gets or sets the position of the player's feet. 
-    member this.FootPosition
-        with get () = position
-        and set value = position <- value
+    /// Gets the direction going in front of a player.
+    let fowardDir (player : Player) = Vector3.cylindrical player.Theta 1.0 0.0
 
-    /// Gets or sets the position of the player's eyes.
-    member this.EyePosition
-        with get () = position + Vector3d (0.0, 0.0, eyeHeight)
-        and set value = position <- value - Vector3d (0.0, 0.0, eyeHeight)
+     /// Gets the direction going behind a player.
+    let backDir (player : Player) = Vector3.cylindrical player.Theta -1.0 0.0
+
+    /// Gets the direction going to the left of a player.
+    let leftDir (player : Player) = Vector3.cross upDir (fowardDir player)
+
+    /// Gets the direction going to the right of a player.
+    let rightDir (player : Player) = Vector3.cross (fowardDir player) upDir
+
+    /// Gets the position at the base of a player.
+    let footPos (player : Player) = player.Position
+
+    /// The height of a player's eyes above the his feet.
+    let eyeHeight = scalar<m> 1.6
+
+    /// Gets the position of a player's eyes.
+    let eyePos (player : Player) = footPos player + upDir * eyeHeight
+
+    /// The maximum movement rate of a player.
+    let moveRate = scalar<m/s> 3.0
+
+    /// Updates a player.
+    let update (player : Player) w a s d (time : Scalar<s>) =
+        let movement = moveRate * time
+        if w then player.Position <- player.Position + fowardDir player * movement
+        if a then player.Position <- player.Position + leftDir player * movement
+        if s then player.Position <- player.Position + backDir player * movement
+        if d then player.Position <- player.Position + rightDir player * movement
+        player.Position.Z <- 0.0<m>
