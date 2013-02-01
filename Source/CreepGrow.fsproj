@@ -45,10 +45,12 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Util.fs" />
     <Compile Include="Quantity.fs" />
     <Compile Include="Container.fs" />
-    <Compile Include="Render.fs" />
+    <Compile Include="Draw.fs" />
     <Compile Include="Texture.fs" />
+    <Compile Include="VBO.fs" />
     <Compile Include="Skybox.fs" />
     <Compile Include="Ground.fs" />
     <Compile Include="Resources.fs" />

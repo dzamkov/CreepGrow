@@ -23,7 +23,6 @@ module Bounds =
         val Max : Vector3<'u>
 
         new (min, max) = { Min = min; Max = max }
-        new (vertex) = { Min = vertex; Max = vertex }
 
         /// Gets the union of two bounding boxes.
         static member (||.) (a : Box<'u>, b : Box<'u>) =
@@ -43,16 +42,52 @@ module Bounds =
                           max a.Max.Y b.Y, 
                           max a.Max.Z b.Z))
 
-        /// Gets a null bounding box, one that contains no points and does not influence
-        /// a union of bounding boxes.
-        static member Null =
-            Box (vec3 infinity infinity infinity,
-                 vec3 -infinity -infinity -infinity)
-
         /// Determines whether this bounding box contains the given point.
         member this.Contains (point : Vector3<'u>) =
             point.X >= this.Min.X && point.Y >= this.Min.Y && point.Z >= this.Min.Z &&
             point.X <= this.Max.X && point.Y <= this.Max.Y && point.Z <= this.Max.Z
+
+    /// Contains functions for constructing and manipulating bounding boxes.
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module Box =
+
+        /// Constructs a bounding box that contains all points between the given minimum
+        /// and maximum points.
+        let create min max = Box<'u> (min, max)
+
+        /// Constructs a bounding box containing the given point.
+        let point point = create point point
+
+        /// Constructs a bounding box containing the given points.
+        let points (points : seq<Vector3<'u>>) =
+            let mutable cMin = vec3 infinity infinity infinity
+            let mutable cMax = vec3 -infinity -infinity -infinity
+            for point in points do
+                cMin.X <- min cMin.X point.X
+                cMin.Y <- min cMin.Y point.Y
+                cMin.Z <- min cMin.Z point.Z
+                cMax.X <- max cMax.X point.X
+                cMax.Y <- max cMax.Y point.Y
+                cMax.Z <- max cMax.Z point.Z
+            create cMin cMax
+
+        /// Constructs a bounding box containing a sphere.
+        let sphere (center : Vector3<'u>) radius =
+            let min = Vector3.create (center.X - radius) (center.Y - radius) (center.Z - radius)
+            let max = Vector3.create (center.X + radius) (center.Y + radius) (center.Z + radius)
+            create min max
+
+        /// Constructs a bounding box that contains no points.
+        let nil () = create (vec3 infinity infinity infinity) (vec3 -infinity -infinity -infinity)
+
+        /// Expands a bounding box to include the given point.
+        let insert (point : Vector3<'u>) (box : Box<'u>) = (box |. point)
+
+        /// Gets the union of two bounding boxes.
+        let union (a : Box<'u>) (b : Box<'u>) = (a ||. b)
+
+        /// Determines whether the given bounding box contains the given point.
+        let contains (box : Box<'u>) point = box.Contains point
 
 /// Contains functions and types related to containers.
 module Container =

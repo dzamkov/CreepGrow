@@ -48,53 +48,37 @@ module Texture =
                 Internal = PixelInternalFormat.Rgb
             }
 
-    /// Loads a texture from a bitmap.
-    let loadBitmap (format : Format) (bitmap : Bitmap) =
-        let texture = create ()
+    /// Reads a bitmap into the currently-bound 2D texture.
+    let readBitmap (format : Format) (bitmap : Bitmap) =
         let rect = Rectangle (0, 0, bitmap.Width, bitmap.Height)
         let data = bitmap.LockBits (rect, ImageLockMode.ReadOnly, format.System)
-        bind2D texture
         GL.TexImage2D (TextureTarget.Texture2D, 0, format.Internal, data.Width, data.Height, 0, 
             format.GL, format.PixelType, data.Scan0)
         bitmap.UnlockBits data
-        texture
 
-    /// Loads a texture from a file.
-    let loadFile (format : Format) (path : string) =
+    /// Reads image data from a file into the currently-bound 2D texture.
+    let readFile (format : Format) (path : string) =
         use bitmap = new Bitmap (path)
-        loadBitmap format bitmap
+        readBitmap format bitmap
 
     /// Generates mipmaps for the currently-bound texture.
     let generateMipmap (target : TextureTarget) =
         GL.Ext.GenerateMipmap (target |> int |> enum)
 
-    /// Sets the wrap mode for the currently bound texture.
+    /// Sets whether mipmaps are automatically generated for the currently-bound texture.
+    let setMipmap target generate =
+        let mode = if generate then Boolean.True else Boolean.False
+        GL.TexParameter (target, TextureParameterName.GenerateMipmap, int mode)
+
+    /// Sets the wrap mode for the currently-bound texture.
     let setWrap target (s : TextureWrapMode) (t : TextureWrapMode) =
-        GL.TexParameter (target, TextureParameterName.TextureWrapS, (int)s)
-        GL.TexParameter (target, TextureParameterName.TextureWrapT, (int)t)
+        GL.TexParameter (target, TextureParameterName.TextureWrapS, int s)
+        GL.TexParameter (target, TextureParameterName.TextureWrapT, int t)
 
-    /// Sets the filter mode for the currently bound texture.
+    /// Sets the filter mode for the currently-bound texture.
     let setFilter target (min : TextureMinFilter) (mag : TextureMagFilter) =
-        GL.TexParameter (target, TextureParameterName.TextureMinFilter, (int)min)
-        GL.TexParameter (target, TextureParameterName.TextureMagFilter, (int)mag)
-
-    /// Prepares the currently bound texture to be rendered using default settings.
-    let setup target =
-        generateMipmap target
-        setWrap target TextureWrapMode.Repeat TextureWrapMode.Repeat
-        setFilter target TextureMinFilter.LinearMipmapLinear TextureMagFilter.Linear
-
-    /// Loads and prepares the a texture from the given bitmap.
-    let setupBitmap format bitmap =
-        let texture = loadBitmap format bitmap
-        setup TextureTarget.Texture2D
-        texture
-
-    /// Loads and prepares the a texture from the given file.
-    let setupFile format path =
-        let texture = loadFile format path
-        setup TextureTarget.Texture2D
-        texture
+        GL.TexParameter (target, TextureParameterName.TextureMinFilter, int min)
+        GL.TexParameter (target, TextureParameterName.TextureMagFilter, int mag)
 
     /// Destroys a texture.
     let destroy (texture : Texture) = GL.DeleteTexture texture

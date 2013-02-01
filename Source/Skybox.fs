@@ -31,7 +31,9 @@ module Skybox =
     /// Loads a skybox from a directory that contains all image parts.
     let loadDirectory (path : string) =
         let prepareFile path =
-            let texture = Texture.loadFile Texture.Format.rgb path
+            let texture = Texture.create ()
+            Texture.bind2D texture
+            Texture.readFile Texture.Format.rgb path
             Texture.setWrap TextureTarget.Texture2D TextureWrapMode.ClampToEdge TextureWrapMode.ClampToEdge
             Texture.setFilter TextureTarget.Texture2D TextureMinFilter.Linear TextureMagFilter.Linear
             texture

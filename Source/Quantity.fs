@@ -12,6 +12,9 @@ open OpenTK
 /// Mass in kilograms
 [<Measure>] type kg
 
+/// Force measured in Newtons.
+[<Measure>] type N = kg m / s ^ 2
+
 /// A scalar quantity.
 type Scalar<[<Measure>] 'a> = float<'a>
 
@@ -21,10 +24,10 @@ let inline scalar<[<Measure>] 'u> value : Scalar<'u> =
 
 /// A three-dimensional vector quantity.
 type [<Struct>] Vector3<[<Measure>] 'a> =
+    new (x, y, z) = { X = x; Y = y; Z = z }
     val mutable X : Scalar<'a>
     val mutable Y : Scalar<'a>
     val mutable Z : Scalar<'a>
-    new (x, y, z) = { X = x; Y = y; Z = z }
     static member (+) (a : Vector3<'a>, b : Vector3<'a>) =
         Vector3<'a> (a.X + b.X, a.Y + b.Y, a.Z + b.Z)
     static member (-) (a : Vector3<'a>, b : Vector3<'a>) =

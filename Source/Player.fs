@@ -1,15 +1,11 @@
 ﻿namespace CreepGrow
 
 open System
+open Util
 open Quantity
 
 /// Describes a player.
 type Player () =
-    let mutable theta = 0.0
-    let mutable phi = 0.0
-    let mutable position = vec3<m> 0.0 0.0 0.0
-    static let eyeHeight = scalar<m> 1.6
-    static let up = vec3<1> 0.0 0.0 1.0
 
     /// The angle on the Z axis the player is looking towards.
     [<DefaultValue>] val mutable Theta : float
@@ -55,10 +51,12 @@ module Player =
     let moveRate = scalar<m/s> 3.0
 
     /// Updates a player.
-    let update (player : Player) w a s d (time : Scalar<s>) =
+    let update (player : Player) dX dY w a s d (time : Scalar<s>) =
         let movement = moveRate * time
         if w then player.Position <- player.Position + fowardDir player * movement
         if a then player.Position <- player.Position + leftDir player * movement
         if s then player.Position <- player.Position + backDir player * movement
         if d then player.Position <- player.Position + rightDir player * movement
+        player.Theta <- player.Theta - dX
+        player.Phi <- (player.Phi - dY) |> max -(pi * 0.4) |> min (pi * 0.4)
         player.Position.Z <- 0.0<m>
