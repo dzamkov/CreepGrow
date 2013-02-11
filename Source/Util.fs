@@ -1,4 +1,4 @@
-﻿module Util
+﻿module CreepGrow.Util
 
 open System
 

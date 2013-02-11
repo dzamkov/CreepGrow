@@ -24,25 +24,25 @@ module Creep =
     let creepBounce = 0.3
 
     /// Describes a joint on a tendril.
-    type [<Struct>] Joint =
+    type Joint () =
 
         /// The point at the center of the joint (absolute).
-        val mutable Center : Vector3<m>
+        [<DefaultValue>] val mutable Center : Vector3<m>
 
         /// The velocity of the joint (absolute).
-        val mutable Velocity : Vector3<m/s>
+        [<DefaultValue>] val mutable Velocity : Vector3<m/s>
 
         /// The mass attributed to this joint.
-        val mutable Mass : Scalar<kg>
+        [<DefaultValue>] val mutable Mass : Scalar<kg>
 
         /// The radius of the exterior of this joint.
-        val mutable Radius : Scalar<m>
+        [<DefaultValue>] val mutable Radius : Scalar<m>
 
         /// The inner area of this joint through which creep-goo can flow.
-        val mutable Area : Scalar<m^2>
+        [<DefaultValue>] val mutable Area : Scalar<m^2>
 
     /// Updates an individual creep joint.
-    let updateJoint (joint : Joint byref) time =
+    let updateJoint (joint : Joint) time =
         joint.Center <- joint.Center + joint.Velocity * time
         if joint.Center.Z - joint.Radius < scalar<m> 0.0 then
             joint.Center.Z <- joint.Radius
@@ -50,27 +50,30 @@ module Creep =
         else joint.Velocity.Z <- joint.Velocity.Z - scalar<m/s^2> 9.8 * time
 
     /// Describes a feature on a tendril. 
-    type Feature () =
+    type Feature (start : Joint) =
         
         /// The joint at the beginning of this feature.
-        [<DefaultValue>] val mutable Start : Joint
+        member this.Start = start
 
     /// Describes a segment on a tendril.
-    type Segment () =
-        inherit Feature ()
+    type Segment (start, following : Feature) =
+        inherit Feature (start)
+
+        /// The feature following this segment.
+        member this.Following = following
+
+        /// The joint at the end of this segment.
+        member this.End = following.Start
 
         /// The target length of this segment.
         [<DefaultValue>] val mutable Length : Scalar<m>
-
-        /// The feature that follows this segment.
-        [<DefaultValue>] val mutable Following : Feature
 
         /// The segment that precedes this segment, or null if
         /// not applicable.
         [<DefaultValue>] val mutable Preceding : Segment
 
     /// Applies a spring force along a segment.
-    let applySpring (length : Scalar<m>) (s : Joint byref) (e : Joint byref) dis (dir : Vector3<1>) (time : Scalar<s>) =
+    let applySpring (length : Scalar<m>) (s : Joint) (e : Joint) dis (dir : Vector3<1>) (time : Scalar<s>) =
         let impulse = dir * (stiffness * (length - dis) * time)
         s.Velocity <- s.Velocity + impulse / s.Mass
         e.Velocity <- e.Velocity - impulse / e.Mass
@@ -79,33 +82,57 @@ module Creep =
     let rec updateTree xDir rDir (feature : Feature) inflow time =
         let zDir = Vector3.dir (Vector3.cross xDir rDir)
         let yDir = Vector3.cross zDir xDir
-
-        updateJoint (&feature.Start) time
+        updateJoint feature.Start time
         match feature with
         | :? Segment as segment ->
             let s = segment.Start
-            let e = segment.Following.Start
+            let e = segment.End
             let dif = e.Center - s.Center
             let dis = Vector3.len dif
             let dir = dif / dis
 
             segment.Length <- segment.Length * (1.1 ** float time)
-            applySpring segment.Length (&segment.Start) (&segment.Following.Start) dis dir time
+            applySpring segment.Length s e dis dir time
             updateTree dir yDir segment.Following inflow time
         | _ -> ()
 
     /// Creates an initial greep growth, returning the root feature.
     let init () =
-        let mutable s = Unchecked.defaultof<Joint>
+        let s = Joint ()
         s.Center <- vec3<m> 0.0 0.0 0.0
         s.Mass <- scalar<kg> 0.4
         s.Radius <- scalar<m> 0.2
-        let mutable e = Unchecked.defaultof<Joint>
+
+        let e = Joint ()
         e.Center <- vec3<m> 0.1 0.1 1.0
         e.Mass <- scalar<kg> 0.1
-        let mutable seg = Segment ()
-        seg.Start <- s
+
+        let tail = Feature e
+        let seg = Segment (s, tail)
         seg.Length <- scalar<m> 1.0
-        seg.Following <- Feature ()
-        seg.Following.Start <- e
         seg
+
+    /// Contains functions and types related to the visual aspects of creep.
+    (* module Visual =
+        open VBO
+
+        /// Contains functions related to joint geometry.
+        module Joint =
+
+            /// Cached information about a joint in a VBO.
+            type Cache (ring : Geometry.Ring) =
+
+                /// The ring for this joint.
+                member this.Ring = ring
+
+        /// Writes the geometry of a feature and all of its descendents to the given streams.
+        let rec writeTree xDir rDir (feature : Feature) (vertices : Stream<Vertex.T2fN3fV3f>) (indices : Stream<uint32>) =
+            let zDir = Vector3.dir (Vector3.cross xDir rDir)
+            let yDir = Vector3.cross zDir xDir
+            match feature with
+            | :? Segment as segment ->
+                let s = segment.Start
+                let e = segment.End
+                let dif = e.Center - s.Center
+                let dis = Vector3.len dif
+                let dir = dif / dis *)

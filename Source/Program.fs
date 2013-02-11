@@ -101,6 +101,7 @@ type Window () =
         this.VSync <- VSyncMode.Adaptive
         this.WindowState <- WindowState.Maximized
         game <- Game ()
+        game.Initialize ()
 
     override this.OnRenderFrame args =
         game.Render (float this.Width / float this.Height)

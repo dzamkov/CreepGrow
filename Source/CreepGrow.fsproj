@@ -25,6 +25,7 @@
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>true</Prefer32Bit>
+    <NoWarn>9</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -49,7 +50,9 @@
     <Compile Include="Quantity.fs" />
     <Compile Include="Container.fs" />
     <Compile Include="Draw.fs" />
+    <Compile Include="Extensions.fs" />
     <Compile Include="Texture.fs" />
+    <Compile Include="Geometry.fs" />
     <Compile Include="VBO.fs" />
     <Compile Include="Skybox.fs" />
     <Compile Include="Ground.fs" />

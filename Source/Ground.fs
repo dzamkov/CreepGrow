@@ -3,7 +3,7 @@
 open OpenTK
 open OpenTK.Graphics
 open OpenTK.Graphics.OpenGL
-open Util
+open CreepGrow.Util
 
 /// Describes a level ground surface that blends into the skybox below the horizon.
 type Ground = {
@@ -61,7 +61,7 @@ module Ground =
         let vertices = Array.zeroCreate totalVertexCount
         let vertexIndex (i : int) (j : int) = uint16 (i + (j * edgeVertexCount))
         let setVertex i j (x : float) (y : float) (alpha : float) =
-            let mutable vertex = VBO.Vertex.T2fC4fN3fV3f ()
+            let mutable vertex = Vertex.T2fC4fN3fV3f ()
             vertex.UV <- Vector2 (float32 x, float32 y)
             vertex.Color <- Color4 (color.R, color.G, color.B, color.A * float32 alpha)
             vertex.Normal <- Vector3 (0.0f, 0.0f, 1.0f)
