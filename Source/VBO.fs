@@ -34,67 +34,35 @@ module VBO =
     let fill target (data : 'a[]) =
         GL.BufferData (target, nativeint data.Length * nativeint sizeof<'a>, data, BufferUsageHint.StaticDraw)
 
-    /// A stream for writing or appending items to a VBO.
-    type Stream<'a when 'a : unmanaged> (target, size : uint32, index : uint32, destination : nativeptr<'a>) =
-        let size = size
-        let mutable index = index
-        let mutable destination = destination
+    /// Contains functions for mapping VBO's.
+    module Map =
 
-        /// Gets the size of the underlying buffer for this stream.
-        member this.Size = size
-
-        /// Gets the index of the next item to be written to this stream.
-        member this.Index = index
-
-        /// Closes this stream.
-        member this.Finish () = GL.UnmapBuffer target
-
-        interface Geometry.Stream<'a> with
-            member this.Write item =
-                if index < size then
-                    NativePtr.write destination item
-                    destination <- NativePtr.add destination 1
-                    index <- index + 1u
-                    true
-                else false
-
-        interface Geometry.Stream.Indexed<'a, uint32> with
-            member this.Index = index
-
-    /// Contains functions for constructing VBO write streams.
-    module Stream =
-
-        /// Creates a stream to fill a currently-bound VBO.
+        /// Maps a VBO to fill it for the first time.
         let fill target size =
-            let bufferSize = nativeint size * nativeint sizeof<'a>
-            GL.BufferData (target, bufferSize, nativeint 0, BufferUsageHint.DynamicDraw)
-            let destination = GL.MapBuffer (target, BufferAccess.WriteOnly)
-            Stream<'a> (target, size, 0u, NativePtr.ofNativeInt destination)
+            GL.BufferData (target, size, nativeint 0, BufferUsageHint.DynamicDraw)
+            GL.MapBuffer (target, BufferAccess.WriteOnly)
 
-        /// Creates a stream to the replace the contents of a currently-bound VBO.
+        /// Maps a VBO to replace its contents.
         let replace target size =
-            let bufferSize = nativeint size * nativeint sizeof<'a>
             if Extensions.mapBufferRange.Enabled then
                 let access = BufferAccessMask.MapInvalidateBufferBit ||| BufferAccessMask.MapWriteBit
-                let destination = GL.MapBufferRange (target, nativeint 0, bufferSize, access)
-                Stream<'a> (target, size, 0u, NativePtr.ofNativeInt destination)
+                GL.MapBufferRange (target, nativeint 0, size, access)
             else
-                GL.BufferData (target, bufferSize, nativeint 0, BufferUsageHint.DynamicDraw)
-                let destination = GL.MapBuffer (target, BufferAccess.WriteOnly)
-                Stream<'a> (target, size, 0u, NativePtr.ofNativeInt destination)
+                GL.BufferData (target, size, nativeint 0, BufferUsageHint.DynamicDraw)
+                GL.MapBuffer (target, BufferAccess.WriteOnly)
 
-        /// Creates a stream to append the contents of a currently-bound VBO.
-        let append target size index =
-            let bufferOffset = nativeint index * nativeint sizeof<'a>
+        /// Maps a VBO to append to its contents.
+        let append target start size =
             if Extensions.mapBufferRange.Enabled then
                 let access = BufferAccessMask.MapUnsynchronizedBit ||| BufferAccessMask.MapWriteBit
-                let destination = GL.MapBufferRange (target, bufferOffset, nativeint (size - index) * nativeint sizeof<'a>, access)
-                Stream<'a> (target, size, index, NativePtr.ofNativeInt destination)
+                GL.MapBufferRange (target, start, size - start, access)
             else
-                let destination = GL.MapBuffer (target, BufferAccess.WriteOnly)
-                Stream<'a> (target, size, index, NativePtr.add (NativePtr.ofNativeInt destination) (int index)) 
+                GL.MapBuffer (target, BufferAccess.WriteOnly) - start
+                
+    /// Unmaps a VBO.
+    let unmap target = GL.UnmapBuffer target |> ignore
 
-    /// Contains various vertex types and functions related to vertex buffers.
+    /// Contains functions related to vertex buffers.
     module Vertex =
 
         /// Binds a VBO to ArrayBuffer.
@@ -123,6 +91,42 @@ module VBO =
         /// Draws the contents of the currently-bound index buffer.
         let draw elementsType mode count =
             GL.DrawElements (mode, count, elementsType, IntPtr.Zero)
+
+    /// Contains stream types that write to VBO's.
+    module Stream =
+
+        /// A vertex stream that writes to a VBO.
+        type Vertex<'a when 'a : unmanaged> (destination : nativeptr<'a>, rangeEnd : nativeint) =
+            inherit Stream.Vertex<'a> ()
+            let mutable destination = destination
+            new (map : nativeint -> nativeint, size : nativeint) = 
+                let destination = map size
+                Vertex<'a> (NativePtr.ofNativeInt destination, destination + size)
+
+            override this.Write () =
+                let nDestination = NativePtr.add destination 1
+                if NativePtr.toNativeInt nDestination > rangeEnd then raise Stream.Vertex.Overflow
+                NativePtr.write destination this.Next
+                this.Index <- this.Index + 1u
+                destination <- nDestination
+
+        /// An index stream that writes to a VBO.
+        type Index (destination : nativeptr<uint32>, rangeEnd : nativeint) =
+            inherit Stream.Index ()
+            let mutable destination = destination
+            new (map : nativeint -> nativeint, size : nativeint) = 
+                let destination = map size
+                Index (NativePtr.ofNativeInt destination, destination + size)
+
+            /// The amount of indices written to this stream.
+            [<DefaultValue>] val mutable Count : int
+
+            override this.Write index =
+                let nDestination = NativePtr.add destination 1
+                if NativePtr.toNativeInt nDestination > rangeEnd then raise Stream.Index.Overflow
+                NativePtr.write destination index
+                this.Count <- this.Count + 1
+                destination <- nDestination
 
     /// Destroys a VBO.
     let destroy (vbo : VBO) =

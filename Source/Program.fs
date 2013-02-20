@@ -10,16 +10,21 @@ open OpenTK.Graphics
 open OpenTK.Graphics.OpenGL
 open OpenTK.Input
 
-open Quantity
+open CreepGrow.Quantity
+open CreepGrow.Convert
 
 let rand = Random ()
 
 type [<AllowNullLiteral>] Game () =
     let player = Player ()
-    let creep = Creep.init ()
+    let mutable creep = Creep.init ()
     let drawGround, _ = Ground.prepare (Resources.ground.Force ())
 
-    member this.Initialize () =
+    let vbos = VBO.createArray 2
+    let vertexVBO = vbos.[0]
+    let indexVBO = vbos.[1]
+    
+    do
         GL.Enable EnableCap.DepthTest
         GL.Enable EnableCap.CullFace
         GL.Enable EnableCap.ColorMaterial
@@ -51,9 +56,9 @@ type [<AllowNullLiteral>] Game () =
         let mutable proj = Matrix4d.CreatePerspectiveFieldOfView (1.2, aspectRatio, 0.1, 1000.0)
         GL.LoadMatrix &proj
 
-        let eyeDir = Player.eyeDir player |> Vector3.toOpenGL
-        let eyePos = Player.eyePos player |> Vector3.toOpenGL
-        let upDir = Player.upDir |> Vector3.toOpenGL
+        let eyeDir = Player.eyeDir player |> Vector3.toOpenTKd
+        let eyePos = Player.eyePos player |> Vector3.toOpenTKd
+        let upDir = Player.upDir |> Vector3.toOpenTKd
         let mutable view = Matrix4d.LookAt (Vector3d (0.0, 0.0, 0.0), eyeDir, upDir)
         GL.MultMatrix &view
 
@@ -74,6 +79,20 @@ type [<AllowNullLiteral>] Game () =
 
         drawGround eyePos ()
 
+        GL.Enable EnableCap.Lighting
+        GL.Disable EnableCap.Texture2D
+        VBO.Vertex.bind vertexVBO
+        VBO.Index.bind indexVBO
+        let vertices = VBO.Stream.Vertex (VBO.Map.fill BufferTarget.ArrayBuffer, nativeint 30000)
+        let indices = VBO.Stream.Index (VBO.Map.fill BufferTarget.ElementArrayBuffer, nativeint 30000)
+        Creep.Visual.writeTree (vec3 0.0 0.0 1.0) (vec3 1.0 0.0 0.0) 0.0f (creep :?> Creep.Segment) vertices indices
+        VBO.unmap BufferTarget.ArrayBuffer
+        VBO.unmap BufferTarget.ElementArrayBuffer
+        let indexCount = indices.Count
+        GL.Color4 (0.6f, 0.0f, 1.0f, 1.0f)
+        VBO.Vertex.setInterleavedFormat InterleavedArrayFormat.T2fN3fV3f
+        VBO.Index.draw DrawElementsType.UnsignedInt BeginMode.TriangleStrip indexCount
+
         GL.ColorMask (false, false, false, false)
         GL.Begin BeginMode.Quads
         GL.Vertex3 (-1000.0, -1000.0, 0.0)
@@ -84,7 +103,7 @@ type [<AllowNullLiteral>] Game () =
         GL.ColorMask (true, true, true, true)
 
     member this.Update (keyboard : KeyboardDevice) dX dY (time : Scalar<s>) =
-        Creep.updateTree (vec3 0.0 0.0 1.0) (vec3 1.0 0.0 0.0) creep 0.0 time
+        Creep.updateTree (vec3 0.0 0.0 1.0) (vec3 1.0 0.0 0.0) &creep 0.0 time
         let isDown key = keyboard.[key]
         Player.update player dX dY (isDown Key.W) (isDown Key.A) (isDown Key.S) (isDown Key.D) time
         
@@ -101,7 +120,6 @@ type Window () =
         this.VSync <- VSyncMode.Adaptive
         this.WindowState <- WindowState.Maximized
         game <- Game ()
-        game.Initialize ()
 
     override this.OnRenderFrame args =
         game.Render (float this.Width / float this.Height)

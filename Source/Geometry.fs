@@ -4,10 +4,11 @@ open Microsoft.FSharp.NativeInterop
 open OpenTK
 open OpenTK.Graphics
 open CreepGrow.Util
+open CreepGrow.Quantity
+open CreepGrow.Convert
 
-/// Contains types for various vertex formats.
+/// Contains various vertex types.
 module Vertex =
-
     type [<Struct>] T2fN3fV3f =
         val mutable UV : Vector2
         val mutable Normal : Vector3
@@ -19,70 +20,96 @@ module Vertex =
         val mutable Normal : Vector3
         val mutable Position : Vector3
 
+/// Contains functions and types related to geometry streams.
+module Stream =
+
+    /// A write-only stream that accepts vertex data.
+    type [<AbstractClass>] Vertex<'a> () =
+
+        /// Describes the next vertex to be written to this stream.
+        [<DefaultValue>] val mutable Next : 'a
+        
+        /// The index of the next vertex to be written to this stream. This advances after
+        /// every write.
+        [<DefaultValue>] val mutable Index : uint32
+
+        /// Writes a vertex to this stream.
+        abstract Write : unit -> unit
+    
+    /// Contains functions and types related to vertex streams.
+    module Vertex =
+
+        /// A vertex stream accepting vertices with texture coordinates.
+        type Textured = Vertex<Vertex.T2fN3fV3f>
+
+        /// An exception raised when a vertex stream overflows.
+        exception Overflow
+
+    /// A write-only stream that accepts index data.
+    type [<AbstractClass>] Index () =
+
+        /// Writes an index to this stream.
+        abstract Write : uint32 -> unit
+
+    /// Contains functions and types related to index streams.
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module Index =
+
+        /// An exception raised when an index stream overflows.
+        exception Overflow
+
 /// Contains functions for writing geometry.
 module Geometry =
-
-    /// A write-only stream that accepts geometry data.
-    type Stream<'a> =
-
-        /// Tries writing an item to this stream, returning true on success or false if there
-        /// is an overflow.
-        abstract Write : 'a -> bool
-
-    /// Contains types and functions related to geometry streams.
-    module Stream =
-
-        /// A geometry stream where each written item is associated with a sequential index.
-        type Indexed<'a, 'b> =
-            inherit Stream<'a>
-
-            /// The index of the next item to be written to this stream.
-            abstract Index : 'b
-    
-    /// An exception raised when the vertex buffer overflows.
-    exception VertexOverflow
-
-    /// An exception raised when the index buffer overflows.
-    exception IndexOverflow
-
+        
     /// Writes a vertex to the given stream.
-    let inline writeVertex (vertex : 'a byref) (vertices : #Stream<'a>) =
-        if not (vertices.Write vertex) then raise VertexOverflow
+    let inline writeVertex vertex (vertices : #Stream.Vertex<'a>) =
+        vertices.Next <- vertex
+        vertices.Write ()
 
     /// Writes an index to the given stream.
-    let inline writeIndex (index : 'a) (indices : #Stream<'a>) =
-        if not (indices.Write index) then raise IndexOverflow
+    let inline writeIndex (index : uint32) (indices : #Stream.Index) =
+        indices.Write index
 
-    /// Identifies a ring of vertices.
-    type [<Struct>] Ring<'a> (``base`` : 'a, count : int) =
+    /// Identifies a curve of vertices. If the last vertex repeats the first, the curve is closed.
+    type [<Struct>] Curve (``base`` : uint32, count : int) =
             
-        /// The base vertex for this ring.
+        /// The base vertex for this curve.
         member this.Base = ``base``
 
-        /// The number of vertices in this ring.
+        /// The number of vertices in this curve.
         member this.Count = count
 
     /// Writes a circular ring to the given stream.
-    let inline writeRing count center radius xDir yDir zDir normalX normalR v (vertices : Stream.Indexed<Vertex.T2fN3fV3f, 'a>) =
+    let writeRing count normal normalOffset position positionOffset v (vertices : #Stream.Vertex.Textured) =
         let ``base`` = vertices.Index
-        let thetaDelta = 2.0f * float32 pi / float32 count
+        let thetaDelta = 2.0 * float pi / float count
         let uDelta = 1.0f / float32 count
-        let baseNormal = (xDir : Vector3) * normalX
-        let mutable vertex = Vertex.T2fN3fV3f ()
-        for i = 0 to count - 1 do
-            let theta = thetaDelta * float32 i
-            let u = uDelta * float32 i
-            let dir = (yDir : Vector3) * cos theta + (zDir : Vector3) * sin theta
-            vertex.Position <- center + dir * radius
-            vertex.Normal <- baseNormal + dir * normalR
-            vertex.UV.X <- u
-            vertex.UV.Y <- v
-            writeVertex &vertex vertices
+        vertices.Next.UV.Y <- v
+        for i = 0 to count do
+            let theta = thetaDelta * float i
+            let dir = vec2<1> (cos theta) (sin theta)
+            vertices.Next.UV.X <- uDelta * float32 i
+            vertices.Next.Normal <- Vector3.toOpenTKf (normalOffset + (normal : Matrix23<1>) * dir)
+            vertices.Next.Position <- Vector3.toOpenTKf (positionOffset + (position : Matrix23<'u>) * dir)
+            vertices.Write ()
+        Curve (``base``, count + 1)
 
     /// Contains triangle-strip primitive writing functions.
     module Strips =
 
-        /// Writes a tube connecting two rings to the given stream.
-        let writeTube (a : Ring<'a>) (b : Ring<'a>) (indices : Stream<'a>) =
-            let mutable i = 0
-            
+        /// Writes a surface connecting two curves to the given stream.
+        let writeSurface (a : Curve) (b : Curve) (indices : #Stream.Index) =
+            writeIndex (b.Base) indices
+            if a.Count = b.Count then
+                for i = 0 to a.Count - 1 do
+                    writeIndex (b.Base + uint32 i) indices
+                    writeIndex (a.Base + uint32 i) indices
+            elif a.Count > b.Count then
+                for i = 0 to a.Count - 1 do
+                    writeIndex (b.Base + uint32 (i * b.Count / a.Count)) indices
+                    writeIndex (a.Base + uint32 i) indices
+            else
+                for i = 0 to b.Count - 1 do
+                    writeIndex (b.Base + uint32 i) indices
+                    writeIndex (a.Base + uint32 (i * a.Count / b.Count)) indices
+            writeIndex (a.Base + uint32 a.Count - 1u) indices

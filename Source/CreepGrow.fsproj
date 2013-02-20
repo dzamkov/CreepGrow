@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="Util.fs" />
     <Compile Include="Quantity.fs" />
+    <Compile Include="Convert.fs" />
     <Compile Include="Container.fs" />
     <Compile Include="Draw.fs" />
     <Compile Include="Extensions.fs" />

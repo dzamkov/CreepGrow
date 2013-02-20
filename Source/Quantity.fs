@@ -1,7 +1,6 @@
 ﻿module CreepGrow.Quantity
 
 open Microsoft.FSharp.Core
-open OpenTK
 
 /// Distance in meters.
 [<Measure>] type m
@@ -18,9 +17,23 @@ open OpenTK
 /// A scalar quantity.
 type Scalar<[<Measure>] 'a> = float<'a>
 
-/// Constructs a scalar with the given measure
-let inline scalar<[<Measure>] 'u> value : Scalar<'u> = 
-    LanguagePrimitives.FloatWithMeasure<'u> value
+/// A two-dimensional vector quantity.
+type [<Struct>] Vector2<[<Measure>] 'a> =
+    new (x, y) = { X = x; Y = y }
+    val mutable X : Scalar<'a>
+    val mutable Y : Scalar<'a>
+    static member (+) (a : Vector2<'a>, b : Vector2<'a>) =
+        Vector2<'a> (a.X + b.X, a.Y + b.Y)
+    static member (-) (a : Vector2<'a>, b : Vector2<'a>) =
+        Vector2<'a> (a.X - b.X, a.Y - b.Y)
+    static member (*) (a : Vector2<'a>, b : Scalar<'b>) =
+        Vector2<'a 'b> (a.X * b, a.Y * b)
+    static member (*) (a : Scalar<'a>, b : Vector2<'b>) =
+        Vector2<'a 'b> (a * b.X, a * b.Y)
+    static member (*) (a : Vector2<'a>, b : Vector2<'b>) =
+        (a.X * b.X + a.Y * b.Y) : Scalar<'a 'b>
+    static member (/) (a : Vector2<'a>, b : Scalar<'b>) =
+        Vector2<'a / 'b> (a.X / b, a.Y / b)
 
 /// A three-dimensional vector quantity.
 type [<Struct>] Vector3<[<Measure>] 'a> =
@@ -41,7 +54,47 @@ type [<Struct>] Vector3<[<Measure>] 'a> =
     static member (/) (a : Vector3<'a>, b : Scalar<'b>) =
         Vector3<'a / 'b> (a.X / b, a.Y / b, a.Z / b)
 
-/// Contains functions for three-dimensional vectors.
+/// A matrix quantity that projects from two-dimensional space to three-dimensional space.
+type [<Struct>] Matrix23<[<Measure>] 'a> =
+    new (x, y) = { X = x; Y = y }
+    val mutable X : Vector3<'a>
+    val mutable Y : Vector3<'a>
+    static member (+) (a : Matrix23<'a>, b : Matrix23<'a>) =
+        Matrix23<'a> (a.X + b.X, a.Y + b.Y)
+    static member (-) (a : Matrix23<'a>, b : Matrix23<'a>) =
+        Matrix23<'a> (a.X - b.X, a.Y - b.Y)
+    static member (*) (a : Matrix23<'a>, b : Scalar<'b>) =
+        Matrix23<'a 'b> (a.X * b, a.Y * b)
+    static member (*) (a : Scalar<'a>, b : Matrix23<'b>) =
+        Matrix23<'a 'b> (a * b.X, a * b.Y)
+    static member (*) (a : Matrix23<'a>, b : Vector2<'b>) =
+       (a.X * b.X + a.Y * b.Y) : Vector3<'a 'b>
+    static member (/) (a : Matrix23<'a>, b : Scalar<'b>) =
+        Matrix23<'a / 'b> (a.X / b, a.Y / b)
+
+/// Contains functions related to two-dimensional vectors.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Vector2 =
+
+    /// Constructs a vector.
+    let create x y = Vector2<'u> (x, y)
+
+    /// Constructs a vector from circular coordinates. Note that here, phi means the angle above
+    /// or below the XY plane.
+    let circular theta (radius : Scalar<'u>) =
+        create (radius * cos theta)
+               (radius * sin theta)
+
+    /// Gets the square of the length of a vector.
+    let inline sqrLen (vec : Vector2<'u>) : Scalar<'u 'u> = vec.X * vec.X + vec.Y * vec.Y
+
+    /// Gets the length of a vector.
+    let len (vec : Vector2<'u>) : Scalar<'u> = sqrt (sqrLen vec)
+
+    /// Gets the direction of a vector.
+    let dir (vec : Vector2<'u>) = vec / len vec
+
+/// Contains functions related to three-dimensional vectors.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Vector3 =
 
@@ -61,11 +114,11 @@ module Vector3 =
                (radius * sin theta)
                z
 
-    /// Gets the length of a vector.
-    let len (vec : Vector3<'u>) : Scalar<'u> = sqrt (vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z)
-
     /// Gets the square of the length of a vector.
-    let sqrLen (vec : Vector3<'u>) : Scalar<'u 'u> = vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z
+    let inline sqrLen (vec : Vector3<'u>) : Scalar<'u 'u> = vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z
+
+    /// Gets the length of a vector.
+    let len (vec : Vector3<'u>) : Scalar<'u> = sqrt (sqrLen vec)
 
     /// Gets the direction of a vector.
     let dir (vec : Vector3<'u>) = vec / len vec
@@ -76,9 +129,19 @@ module Vector3 =
                (a.Z * b.X - a.X * b.Z)
                (a.X * b.Y - a.Y * b.X)
 
+/// Contains functions related to two by three matrices.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Matrix23 =
 
-    /// Converts a vector quantity to an OpenGL vector.
-    let toOpenGL (vec : Vector3<'u>) = Vector3d (float vec.X, float vec.Y, float vec.Z)
+    /// Constructs a matrix.
+    let create x y = Matrix23<'u> (x, y)
+
+/// Constructs a scalar with the given measure
+let inline scalar<[<Measure>] 'u> value : Scalar<'u> = 
+    LanguagePrimitives.FloatWithMeasure<'u> value
+
+/// Constructs a two-dimensional vector of the given measure.
+let inline vec2<[<Measure>] 'u> x y = Vector2.create (scalar<'u> x) (scalar<'u> y)
 
 /// Constructs a three-dimensional vector of the given measure.
 let inline vec3<[<Measure>] 'u> x y z = Vector3.create (scalar<'u> x) (scalar<'u> y) (scalar<'u> z)
